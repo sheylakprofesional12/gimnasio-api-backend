@@ -1,0 +1,75 @@
+package com.example.demo.controller;
+
+import com.example.demo.Model.SocioMapping;
+import com.example.demo.Model.SocioModel;
+import com.example.demo.dto.CambiarEstadoRequest;
+import com.example.demo.dto.CreateSocioRequest;
+import com.example.demo.dto.ReporteSocio;
+import com.example.demo.dto.UpdateSocioRequest;
+import com.example.demo.service.SocioService;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@CrossOrigin(origins = "*")
+@RestController
+@RequestMapping("/gimnasio")
+public class SocioController {
+
+    @Autowired
+    private SocioService socioService;
+
+    @Autowired
+    private SocioMapping socioMapping;
+
+    @GetMapping
+    @ResponseStatus(HttpStatus.OK)
+    public List<SocioModel> obtenerSocios() {
+        return socioService.buscarSocios();
+    }
+
+    @GetMapping("/cantidad")
+    @ResponseStatus(HttpStatus.OK)
+    public long obtenerCantidadSocios() {
+        return socioService.cantidadSocios();
+    }
+
+    @GetMapping("/reporte")
+    @ResponseStatus(HttpStatus.OK)
+    public ReporteSocio obtenerReporte() {
+        return socioService.generarReporte();
+    }
+
+    @GetMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    public SocioModel obtenerSocioPorId(@PathVariable Long id) {
+        return socioService.buscarSocioPorId(id);
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public SocioModel crearSocio(@Valid @RequestBody CreateSocioRequest createSocioRequest) {
+        return socioService.crearSocio(socioMapping.convert(createSocioRequest));
+    }
+
+    @PutMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    public SocioModel updateSocio(@Valid @RequestBody UpdateSocioRequest updateSocioRequest, @PathVariable Long id) {
+        return socioService.updateSocio(id, updateSocioRequest);
+    }
+
+    @PatchMapping("/{id}/estado")
+    @ResponseStatus(HttpStatus.OK)
+    public SocioModel cambiarEstado(@Valid @RequestBody CambiarEstadoRequest request, @PathVariable Long id) {
+        return socioService.cambiarEstado(id, request.getActivo());
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminarSocio(@PathVariable Long id) {
+        socioService.eliminarSocio(id);
+    }
+}
