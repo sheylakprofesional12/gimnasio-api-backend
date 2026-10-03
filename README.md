@@ -84,60 +84,107 @@ Al iniciar por primera vez, el sistema crea dos usuarios por defecto:
 
 ---
 
-## Base de Datos y Migracion a PostgreSQL
+## Base de Datos: PostgreSQL
 
-### Estado actual: SQL Server
-El proyecto esta configurado actualmente para funcionar con Microsoft SQL Server en `application.properties`:
+El proyecto usa **PostgreSQL** con la base de datos `core_gimnasio`.
+
+### Configuracion de conexion
+En `src/main/resources/application.properties`:
 
 ```properties
-spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=gimprueba;encrypt=true;trustServerCertificate=true
-spring.datasource.username=luis
-spring.datasource.password=123
+spring.datasource.url=jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:core_gimnasio}
+spring.datasource.username=${DB_USER:postgres}
+spring.datasource.password=${DB_PASSWORD:admin}
+spring.datasource.driver-class-name=org.postgresql.Driver
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
 ```
 
-### Pasos para migrar a PostgreSQL
-El proyecto se puede migrar facilmente a PostgreSQL en 3 pasos:
+Los valores admiten variables de entorno con valor por defecto, asi que la misma
+configuracion sirve para desarrollo local y para Docker:
 
-1. En `build.gradle`, cambiar las dependencias de SQL Server por el driver de PostgreSQL:
-   ```groovy
-   runtimeOnly 'org.postgresql:postgresql'
-   ```
+| Variable | Por defecto | Descripcion |
+|---|---|---|
+| `DB_HOST` | `localhost` | Host de PostgreSQL (`postgres` dentro de Docker) |
+| `DB_PORT` | `5432` | Puerto de PostgreSQL |
+| `DB_NAME` | `core_gimnasio` | Nombre de la base de datos |
+| `DB_USER` | `postgres` | Usuario de la base de datos |
+| `DB_PASSWORD` | `admin` | Contrasena de la base de datos |
 
-2. En `src/main/resources/application.properties`, actualizar la conexion:
-   ```properties
-   spring.datasource.url=jdbc:postgresql://localhost:5432/gimprueba
-   spring.datasource.username=postgres
-   spring.datasource.password=tu_password
-   spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
-   ```
+### Dependencias (Gradle)
+```groovy
+runtimeOnly 'org.postgresql:postgresql'
+runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+```
 
-3. En `src/main/resources/db/migration/V1__crear_tablas_iniciales.sql`, adaptar la sintaxis de las tablas a PostgreSQL:
-   ```sql
-   DROP TABLE IF EXISTS socio CASCADE;
-   DROP TABLE IF EXISTS usuario CASCADE;
+### Migracion de tablas (Flyway)
+La migracion `src/main/resources/db/migration/V1__crear_tablas_iniciales.sql` crea
+las tablas `usuario` y `socio` en sintaxis PostgreSQL:
 
-   CREATE TABLE usuario (
-       id             BIGSERIAL PRIMARY KEY,
-       username       VARCHAR(50)  NOT NULL UNIQUE,
-       password       VARCHAR(100) NOT NULL,
-       rol            VARCHAR(20)  NOT NULL DEFAULT 'EMPLEADO',
-       activo         BOOLEAN      NOT NULL DEFAULT TRUE,
-       fecha_creacion TIMESTAMP    NULL
-   );
+```sql
+DROP TABLE IF EXISTS socio CASCADE;
+DROP TABLE IF EXISTS usuario CASCADE;
 
-   CREATE TABLE socio (
-       id             BIGSERIAL PRIMARY KEY,
-       dni            VARCHAR(8)   NULL,
-       nombre         VARCHAR(100) NULL,
-       apellido       VARCHAR(100) NULL,
-       activo         BOOLEAN      NOT NULL DEFAULT FALSE,
-       telefono       VARCHAR(20)  NULL,
-       correo         VARCHAR(100) NULL,
-       fecha_creacion TIMESTAMP    NULL,
-       usuario_id     BIGINT       NULL REFERENCES usuario (id)
-   );
+CREATE TABLE usuario (
+    id             BIGSERIAL    NOT NULL PRIMARY KEY,
+    username       VARCHAR(50)  NOT NULL,
+    password       VARCHAR(100) NOT NULL,
+    rol            VARCHAR(20)  NOT NULL DEFAULT 'EMPLEADO',
+    activo         BOOLEAN      NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMP    NULL
+);
 
-   CREATE INDEX ix_socio_usuario ON socio (usuario_id);
-   ```
+CREATE UNIQUE INDEX ux_usuario_username ON usuario (username);
 
-El resto del codigo en Java (controladores, servicios, repositorios) no requiere modificaciones.
+CREATE TABLE socio (
+    id             BIGSERIAL    NOT NULL PRIMARY KEY,
+    dni            VARCHAR(8)   NULL,
+    nombre         VARCHAR(100) NULL,
+    apellido       VARCHAR(100) NULL,
+    activo         BOOLEAN      NOT NULL DEFAULT FALSE,
+    telefono       VARCHAR(20)  NULL,
+    correo         VARCHAR(100) NULL,
+    fecha_creacion TIMESTAMP    NULL,
+    usuario_id     BIGINT       NULL,
+    CONSTRAINT fk_socio_usuario FOREIGN KEY (usuario_id) REFERENCES usuario (id)
+);
+
+CREATE INDEX ix_socio_usuario ON socio (usuario_id);
+```
+
+Diferencias clave respecto a SQL Server:
+
+| SQL Server | PostgreSQL |
+|---|---|
+| `BIGINT IDENTITY(1,1)` | `BIGSERIAL` |
+| `BIT` | `BOOLEAN` (`1`/`0` -> `TRUE`/`FALSE`) |
+| `DATETIME2` | `TIMESTAMP` |
+| `IF OBJECT_ID(...) DROP TABLE` | `DROP TABLE IF EXISTS ... CASCADE` |
+| Tablas `Socio` / `Usuario` | En minusculas: `socio` / `usuario` |
+
+> Las entidades usan `@Table(name = "socio")` y `@Table(name = "usuario")` en
+> minusculas porque PostgreSQL pliega a minusculas los identificadores sin comillas.
+
+---
+
+## Ejecucion con Docker
+
+El archivo `docker-compose.yml` levanta PostgreSQL y la API juntos:
+
+```bash
+docker compose up -d --build
+```
+
+- Base de datos: `localhost:5432` (usuario `postgres`, contrasena `admin`, base `core_gimnasio`)
+- API: `http://localhost:8080`
+
+Comandos utiles:
+
+```bash
+docker compose logs -f app              # ver logs del backend
+docker compose ps                       # estado de los contenedores
+docker compose down                     # parar (conserva los datos)
+docker compose down -v                  # parar y borrar el volumen de la base de datos
+```
+
+Los datos de PostgreSQL se guardan en el volumen `pgdata`, por lo que se conservan
+entre reinicios. Flyway crea las tablas automaticamente al arrancar la API.

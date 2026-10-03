@@ -1,0 +1,65 @@
+# ============================================================
+#  docker-compose.yml — PostgreSQL + API Spring Boot
+#
+#  Levanta la base de datos PostgreSQL (core_gimnasio) y el backend.
+#  Uso:
+#    docker compose up -d --build     levanta todo
+#    docker compose logs -f app        ver logs del backend
+#    docker compose down               parar (conserva los datos)
+#    docker compose down -v            parar y BORRAR la base de datos
+# ============================================================
+
+services:
+
+  # ---------------------------------------------------------
+  #  Base de datos PostgreSQL
+  # ---------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    container_name: core_gimnasio_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: core_gimnasio
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      # Checksum de integrity y locale para el contenedor
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      # puerto del host -> puerto del contenedor
+      - "5432:5432"
+    volumes:
+      # volumen nombrado: los datos sobreviven a `docker compose down`
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d core_gimnasio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------
+  #  API Spring Boot
+  # ---------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gimnasio-api-backend:latest
+    container_name: core_gimnasio_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        # espera a que PostgreSQL responda antes de arrancar la API
+        condition: service_healthy
+    environment:
+      # Spring lee estas variables en application.properties
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: core_gimnasio
+      DB_USER: postgres
+      DB_PASSWORD: admin
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

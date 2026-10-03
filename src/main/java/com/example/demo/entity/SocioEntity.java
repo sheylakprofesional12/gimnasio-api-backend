@@ -9,7 +9,7 @@ import java.util.Date;
 
 
 @Entity
-@Table(name = "Socio")
+@Table(name = "socio")
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
