@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@CrossOrigin(origins = "*")
+@CrossOrigin("http://localhost:3000/")
 @RestController
 @RequestMapping("/gimnasio")
 public class SocioController {

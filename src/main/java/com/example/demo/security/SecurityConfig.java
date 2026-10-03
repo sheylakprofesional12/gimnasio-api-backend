@@ -45,6 +45,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/gimnasio", "/gimnasio/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/gimnasio/reporte", "/gimnasio/reporte/**").hasRole("ADMIN")
                         .requestMatchers("/gimnasio", "/gimnasio/**").authenticated()
+                        .requestMatchers( "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/swagger-resources/**",
+                                "/webjars/**" ).permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -55,4 +60,5 @@ public class SecurityConfig {
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
+
 }
